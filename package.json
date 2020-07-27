@@ -1,0 +1,15 @@
+{
+  "name": "sf-academy-user-microservice",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "author": "Zhou Jian",
+  "license": "MIT",
+  "dependencies": {
+    "@grpc/proto-loader": "^0.5.5",
+    "grpc": "^1.24.3"
+  }
+}

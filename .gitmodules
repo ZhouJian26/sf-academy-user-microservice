@@ -1,0 +1,3 @@
+[submodule "sf-academy-proto"]
+	path = sf-academy-proto
+	url = https://github.com/ZhouJian26/sf-academy-proto.git
