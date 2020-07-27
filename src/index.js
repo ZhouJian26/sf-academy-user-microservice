@@ -3,6 +3,11 @@ const PROTO_PATH = __dirname + "/../sf-academy-proto/src/user.proto";
 
 const grpc = require("grpc");
 const protoLoader = require("@grpc/proto-loader");
+const mysql = require("mysql");
+const crypto = require("crypto");
+const sha256 = crypto.createHash("sha256");
+
+const dotenv = require("dotenv").config();
 
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
   keepCase: true,
@@ -13,6 +18,14 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
 });
 
 const user_proto = grpc.loadPackageDefinition(packageDefinition).user;
+
+const pool = mysql.createPool({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_DATABASE,
+  connectionLimit: 10,
+});
 
 const services = {
   signup: (call, callback) => {
