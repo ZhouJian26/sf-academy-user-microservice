@@ -5,7 +5,7 @@ const grpc = require("grpc");
 const protoLoader = require("@grpc/proto-loader");
 const mysql = require("mysql");
 const crypto = require("crypto");
-const sha256 = crypto.createHash("sha256");
+const jwt = require("jsonwebtoken");
 
 const dotenv = require("dotenv").config();
 
@@ -27,6 +27,9 @@ const pool = mysql.createPool({
   connectionLimit: 10,
 });
 
+const signupService = require("./services/signup");
+const loginService = require("./services/login");
+
 const services = {
   signup: (call, callback) => {
     const { email, password, username, iban } = call.request;
@@ -36,16 +39,44 @@ const services = {
       username == undefined ||
       iban == undefined
     )
-      return; // return an error
-    // Signup the new user
-    // KO return error
-    // OK return JWT
+      return callback({
+        code: grpc.status.INVALID_ARGUMENT,
+        message: "Missing values",
+      });
+    signupService(
+      pool,
+      grpc.status,
+      email,
+      crypto.createHash("sha256").update(password).digest("hex"),
+      username,
+      iban
+    )
+      .then(() => {
+        callback(null, { token: "token" });
+      })
+      .catch((e) => {
+        callback(e);
+      });
   },
   login: (call, callback) => {
     const { email, password } = call.request;
-    if (email == undefined || password == undefined) return; // return an error
-    // KO return error
-    // OK return JWT
+    if (email == undefined || password == undefined)
+      return callback({
+        code: grpc.status.INVALID_ARGUMENT,
+        message: "Missing values",
+      });
+    loginService(
+      pool,
+      grpc.status,
+      email,
+      crypto.createHash("sha256").update(password).digest("hex")
+    )
+      .then(() => {
+        callback(null, { token: "token" });
+      })
+      .catch((e) => {
+        callback(e);
+      });
   },
   deposit: (call, callback) => {
     const { currency, amount } = call.request;
@@ -84,6 +115,6 @@ const services = {
 (function main() {
   const server = new grpc.Server();
   server.addService(user_proto.User.service, services);
-  server.bind("0.0.0.0:9000", grpc.ServerCredentials.createInsecure());
+  server.bind("0.0.0.0:9001", grpc.ServerCredentials.createInsecure());
   server.start();
 })();
