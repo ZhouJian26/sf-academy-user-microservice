@@ -12,6 +12,7 @@
     "@grpc/proto-loader": "^0.5.5",
     "dotenv": "^8.2.0",
     "grpc": "^1.24.3",
+    "jsonwebtoken": "^8.5.1",
     "mysql": "^2.18.1"
   }
 }
