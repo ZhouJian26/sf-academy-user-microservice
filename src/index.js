@@ -27,8 +27,14 @@ const pool = mysql.createPool({
   connectionLimit: 10,
 });
 
+const generateJWT = ({ id }) =>
+  jwt.sign({ id: id }, process.env.JWT_KEY, { expiresIn: 60 * 60 * 24 * 365 });
+
 const signupService = require("./services/signup");
 const loginService = require("./services/login");
+const depositService = require("./services/deposit");
+const withdrawService = require("./services/withdraw");
+const buyService = require("./services/buy");
 
 const services = {
   signup: (call, callback) => {
@@ -51,12 +57,11 @@ const services = {
       username,
       iban
     )
-      .then(() => {
-        callback(null, { token: "token" });
+      .then((data) => {
+        console.log(data);
+        callback(null, { token: generateJWT(data) });
       })
-      .catch((e) => {
-        callback(e);
-      });
+      .catch((e) => callback(e));
   },
   login: (call, callback) => {
     const { email, password } = call.request;
@@ -71,44 +76,69 @@ const services = {
       email,
       crypto.createHash("sha256").update(password).digest("hex")
     )
-      .then(() => {
-        callback(null, { token: "token" });
-      })
-      .catch((e) => {
-        callback(e);
-      });
+      .then((data) => callback(null, { token: generateJWT(data) }))
+      .catch((e) => callback(e));
   },
   deposit: (call, callback) => {
-    const { currency, amount } = call.request;
-    if (currency == undefined || amount == undefined) return; //return an error
-    // Add amount in the virtual portfolio
-    // KO return error
-    // OK return 200
+    const { user_id, currency, amount } = call.request;
+    if (
+      (user_id == undefined || currency == undefined || amount == undefined) &&
+      amount > 0
+    )
+      return callback({ code: grpc.status.INVALID_ARGUMENT });
+    depositService(pool, grpc.status, user_id, amount, currency)
+      .then(() => callback(null, {}))
+      .catch((e) => callback(e));
   },
   withdraw: (call, callback) => {
-    const { currency, amount } = call.request;
-    if (currency == undefined || amount == undefined) return; //return an error
-    // Substract amount from the virtual portfolio
-    // KO return error
-    // OK return 200
+    const { user_id, currency, amount } = call.request;
+    if (
+      (user_id == undefined || currency == undefined || amount == undefined) &&
+      amount > 0
+    )
+      return callback({ code: grpc.status.INVALID_ARGUMENT });
+    withdrawService(pool, grpc.status, user_id, amount, currency)
+      .then(() => callback(null, {}))
+      .catch((e) => callback(e));
   },
   buy: (call, callback) => {
-    const { srcCurrency, destCurrency, amount } = call.request;
+    const { user_id, srcCurrency, destCurrency, amount } = call.request;
     if (
-      srcCurrency == undefined ||
-      destCurrency == undefined ||
-      amount == undefined
+      (user_id == undefined ||
+        srcCurrency == undefined ||
+        destCurrency == undefined ||
+        amount == undefined) &&
+      amount > 0
     )
-      return; // return an error
-    // Substract amount from the virtual portfolio, then add the equivalent into dest virtual portfolio
-    // KO return error
-    // OK return 200
+      return callback({ code: grpc.status.INVALID_ARGUMENT });
+    buyService(
+      pool,
+      grpc.status,
+      user_id,
+      srcCurrency,
+      destCurrency,
+      1.1, //todo fetch from exchange service
+      amount
+    )
+      .then(() => callback(null, {}))
+      .catch((e) => callback(e));
   },
   listTransactions: (call, callback) => {
-    const { queries } = call.request;
+    const { user_id, queries } = call.request;
     // Execute on parallel all queries, then concat
     // KO return error
     // OK return results
+  },
+  verifyJWT: (call, callback) => {
+    const { token } = call.request;
+    jwt.verify(token, process.env.JWT_KEY, (err, decoded) => {
+      if (err)
+        return callback({
+          code: grpc.status.INVALID_ARGUMENT,
+          message: err.name + ": " + err.message,
+        });
+      callback(null, {});
+    });
   },
 };
 
