@@ -30,6 +30,20 @@ const pool = mysql.createPool({
 const generateJWT = ({ id }) =>
   jwt.sign({ id: id }, process.env.JWT_KEY, { expiresIn: 60 * 60 * 24 * 365 });
 
+const auth = (token) =>
+  new Promise((res, rej) => {
+    jwt.verify(token[0], process.env.JWT_KEY, (err, decoded) => {
+      if (err)
+        return rej({
+          code: grpc.status.PERMISSION_DENIED,
+          message: err.name + ": " + err.message,
+        });
+      res({ decoded: decoded });
+    });
+  });
+
+const exchangeMicroservice = require("./other/exchange");
+
 const signupService = require("./services/signup");
 const loginService = require("./services/login");
 const depositService = require("./services/deposit");
@@ -80,46 +94,30 @@ const services = {
       .catch((e) => callback(e));
   },
   deposit: (call, callback) => {
-    const { user_id, currency, amount } = call.request;
-    if (
-      (user_id == undefined || currency == undefined || amount == undefined) &&
-      amount > 0
-    )
-      return callback({ code: grpc.status.INVALID_ARGUMENT });
-    depositService(pool, grpc.status, user_id, amount, currency)
+    auth(call.metadata.get("token"))
+      .then(({ decoded }) =>
+        depositService(pool, grpc.status, decoded.id, call.request)
+      )
       .then(() => callback(null, {}))
       .catch((e) => callback(e));
   },
   withdraw: (call, callback) => {
-    const { user_id, currency, amount } = call.request;
-    if (
-      (user_id == undefined || currency == undefined || amount == undefined) &&
-      amount > 0
-    )
-      return callback({ code: grpc.status.INVALID_ARGUMENT });
-    withdrawService(pool, grpc.status, user_id, amount, currency)
+    auth(call.metadata.get("token"))
+      .then(({ decoded }) =>
+        withdrawService(pool, grpc.status, decoded.id, call.request)
+      )
       .then(() => callback(null, {}))
       .catch((e) => callback(e));
   },
   buy: (call, callback) => {
-    const { user_id, srcCurrency, destCurrency, amount } = call.request;
-    if (
-      (user_id == undefined ||
-        srcCurrency == undefined ||
-        destCurrency == undefined ||
-        amount == undefined) &&
-      amount > 0
-    )
-      return callback({ code: grpc.status.INVALID_ARGUMENT });
-    buyService(
-      pool,
-      grpc.status,
-      user_id,
-      srcCurrency,
-      destCurrency,
-      1.1, //todo fetch from exchange service
-      amount
-    )
+    auth(call.metadata.get("token")) //get rate from exchange micro
+      .then(({ decoded }) => {
+        new exchangeMicroservice(process.env.EXCHANGE_MICROSERVICE_URL);
+        return { decoded: decoded, rate: 1.4 };
+      })
+      .then(({ decoded, rate }) =>
+        buyService(pool, grpc.status, decoded.id, call.request, rate)
+      )
       .then(() => callback(null, {}))
       .catch((e) => callback(e));
   },
@@ -128,17 +126,6 @@ const services = {
     // Execute on parallel all queries, then concat
     // KO return error
     // OK return results
-  },
-  verifyJWT: (call, callback) => {
-    const { token } = call.request;
-    jwt.verify(token, process.env.JWT_KEY, (err, decoded) => {
-      if (err)
-        return callback({
-          code: grpc.status.INVALID_ARGUMENT,
-          message: err.name + ": " + err.message,
-        });
-      callback(null, {});
-    });
   },
 };
 
