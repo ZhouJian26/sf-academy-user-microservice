@@ -49,6 +49,7 @@ const loginService = require("./services/login");
 const depositService = require("./services/deposit");
 const withdrawService = require("./services/withdraw");
 const buyService = require("./services/buy");
+const listTransactionsService = require("./services/listTransactions");
 
 const services = {
   signup: (call, callback) => {
@@ -57,7 +58,11 @@ const services = {
       email == undefined ||
       password == undefined ||
       username == undefined ||
-      iban == undefined
+      iban == undefined ||
+      email == "" ||
+      password == "" ||
+      iban == "" ||
+      username == ""
     )
       return callback({
         code: grpc.status.INVALID_ARGUMENT,
@@ -112,20 +117,29 @@ const services = {
   buy: (call, callback) => {
     auth(call.metadata.get("token")) //get rate from exchange micro
       .then(({ decoded }) => {
-        new exchangeMicroservice(process.env.EXCHANGE_MICROSERVICE_URL);
-        return { decoded: decoded, rate: 1.4 };
+        const { srcCurrency, destCurrency, amount } = call.request;
+        return new exchangeMicroservice(process.env.EXCHANGE_MICROSERVICE_URL)
+          .getExchange(amount, srcCurrency, destCurrency, grpc.status)
+          .then(({ value, rate }) => ({
+            user_id: decoded.id,
+            rate: rate,
+            value: value,
+            srcCurrency: srcCurrency,
+            destCurrency: destCurrency,
+            amount: amount,
+          }));
       })
-      .then(({ decoded, rate }) =>
-        buyService(pool, grpc.status, decoded.id, call.request, rate)
-      )
+      .then((data) => buyService(pool, grpc.status, data))
       .then(() => callback(null, {}))
       .catch((e) => callback(e));
   },
   listTransactions: (call, callback) => {
-    const { user_id, queries } = call.request;
-    // Execute on parallel all queries, then concat
-    // KO return error
-    // OK return results
+    auth(call.metadata.get("token"))
+      .then(({ decoded }) =>
+        listTransactionsService(pool, grpc.status, decoded.id, call.request)
+      )
+      .then((results) => callback(null, { transactions: results }))
+      .catch((e) => callback(e));
   },
 };
 
