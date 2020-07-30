@@ -1,13 +1,14 @@
-module.exports = (
-  pool,
-  grpcStatus,
-  user_id,
-  srcCurrency,
-  destCurrency,
-  rate,
-  amount
-) =>
+module.exports = (pool, grpcStatus, user_id, callRequest, rate) =>
   new Promise((res, rej) => {
+    const { srcCurrency, destCurrency, amount } = callRequest;
+    if (
+      (srcCurrency == undefined ||
+        destCurrency == undefined ||
+        amount == undefined) &&
+      amount > 0
+    )
+      return rej({ code: grpc.status.INVALID_ARGUMENT });
+
     pool.getConnection((err, connection) => {
       if (err)
         return rej({

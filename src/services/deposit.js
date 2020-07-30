@@ -1,5 +1,9 @@
-module.exports = (pool, grpcStatus, user_id, amount, currency) =>
+module.exports = (pool, grpcStatus, user_id, callRequest) =>
   new Promise((res, rej) => {
+    const { currency, amount } = callRequest;
+    if ((currency == undefined || amount == undefined) && amount > 0)
+      return rej({ code: grpc.status.INVALID_ARGUMENT });
+
     addAmountIntoPortfolio(pool, grpcStatus, amount, user_id, currency)
       .then(({ affectedRows }) =>
         affectedRows != 0
