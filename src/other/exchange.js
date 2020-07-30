@@ -23,12 +23,23 @@ function ExchangeMicroservice(url) {
 ExchangeMicroservice.prototype.getExchange = function getExchange(
   value,
   from,
-  to
+  to,
+  grpcStatus
 ) {
   return new Promise((res, rej) => {
+    if (from == undefined || to == undefined || value == undefined || value < 0)
+      return rej({
+        code: grpc.status.INVALID_ARGUMENT,
+      });
     this.client.exchange(
       { value: value, from: from, to: to },
-      (err, response) => (err ? rej(err) : res(response))
+      (err, response) =>
+        err
+          ? rej({
+              code: grpcStatus.UNAVAILABLE,
+              message: "Exchange Microservice Unavailable.",
+            })
+          : res(response)
     );
   });
 };
