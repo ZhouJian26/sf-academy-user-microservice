@@ -1,14 +1,9 @@
-module.exports = (pool, grpcStatus, user_id, callRequest, rate) =>
+module.exports = (
+  pool,
+  grpcStatus,
+  { user_id, rate, value, srcCurrency, destCurrency, amount }
+) =>
   new Promise((res, rej) => {
-    const { srcCurrency, destCurrency, amount } = callRequest;
-    if (
-      (srcCurrency == undefined ||
-        destCurrency == undefined ||
-        amount == undefined) &&
-      amount > 0
-    )
-      return rej({ code: grpc.status.INVALID_ARGUMENT });
-
     pool.getConnection((err, connection) => {
       if (err)
         return rej({
@@ -30,7 +25,7 @@ module.exports = (pool, grpcStatus, user_id, callRequest, rate) =>
             return addAmountIntoPortfolio(
               connection,
               grpcStatus,
-              amount * rate,
+              value,
               user_id,
               destCurrency
             );
@@ -47,10 +42,18 @@ module.exports = (pool, grpcStatus, user_id, callRequest, rate) =>
                 grpcStatus,
                 user_id,
                 destCurrency,
-                amount * rate
+                value
               )
         )
-        .then(() => getPortfolioId())
+        .then(() =>
+          getPortfolioId(
+            connection,
+            grpcStatus,
+            user_id,
+            srcCurrency,
+            destCurrency
+          )
+        )
         .then((portfolioId) =>
           createTransaction(
             connection,
@@ -62,7 +65,7 @@ module.exports = (pool, grpcStatus, user_id, callRequest, rate) =>
             rate
           )
         )
-        .then(() => commit())
+        .then(() => commit(connection, grpcStatus))
         .then(() => {
           connection.release();
           res({});
@@ -126,9 +129,12 @@ const getPortfolioId = (connection, grpcStatus, user_id, curr1, curr2) =>
           code: grpcStatus.ABORTED,
           message: err.sqlMessage,
         });
-      const portfolioId = results.map((portfolio) => ({
-        [portfolio.currency]: portfolio.id,
-      }));
+      const portfolioId = Object.assign(
+        {},
+        ...results.map((portfolio) => ({
+          [portfolio.currency]: portfolio.id,
+        }))
+      );
       res(portfolioId);
     });
   });
