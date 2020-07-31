@@ -68,7 +68,7 @@ module.exports = (
         .then(() => commit(connection, grpcStatus))
         .then(() => {
           connection.release();
-          res({});
+          res({ amount: value });
         })
         .catch((err) => {
           connection.rollback(() => {

@@ -130,7 +130,7 @@ const services = {
           }));
       })
       .then((data) => buyService(pool, grpc.status, data))
-      .then(() => callback(null, {}))
+      .then((data) => callback(null, data))
       .catch((e) => callback(e));
   },
   listTransactions: (call, callback) => {
