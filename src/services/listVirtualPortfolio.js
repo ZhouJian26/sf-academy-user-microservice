@@ -1,6 +1,5 @@
 module.exports = (pool, grpcStatus, user_id) =>
   new Promise((res, rej) => {
-    console.log(user_id);
     getVirtualPortfolios(pool, grpcStatus, user_id)
       .then((results) => res(results))
       .catch((e) => rej(e));
