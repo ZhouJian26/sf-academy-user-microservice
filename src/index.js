@@ -50,6 +50,7 @@ const depositService = require("./services/deposit");
 const withdrawService = require("./services/withdraw");
 const buyService = require("./services/buy");
 const listTransactionsService = require("./services/listTransactions");
+const listVirtualPortfoliosService = require("./services/listVirtualPortfolio");
 
 const services = {
   signup: (call, callback) => {
@@ -139,6 +140,14 @@ const services = {
         listTransactionsService(pool, grpc.status, decoded.id, call.request)
       )
       .then((results) => callback(null, { transactions: results }))
+      .catch((e) => callback(e));
+  },
+  listVirtualPortfolios: (call, callback) => {
+    auth(call.metadata.get("token"))
+      .then(({ decoded }) =>
+        listVirtualPortfoliosService(pool, grpc.status, decoded.id)
+      )
+      .then((results) => callback(null, { listVirtualPortfolio: results }))
       .catch((e) => callback(e));
   },
 };
